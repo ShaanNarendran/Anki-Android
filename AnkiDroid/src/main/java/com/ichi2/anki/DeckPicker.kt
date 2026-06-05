@@ -72,6 +72,7 @@ import androidx.core.view.doOnLayout
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
 import androidx.draganddrop.DropHelper
+import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentContainerView
 import androidx.fragment.app.commit
 import androidx.lifecycle.flowWithLifecycle
@@ -82,6 +83,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import anki.collection.OpChanges
 import anki.sync.SyncStatusResponse
+import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.google.android.material.snackbar.BaseTransientBottomBar
 import com.google.android.material.snackbar.Snackbar
@@ -102,6 +104,7 @@ import com.ichi2.anki.android.back.exitViaDoubleTapBackCallback
 import com.ichi2.anki.android.input.ShortcutGroup
 import com.ichi2.anki.android.input.shortcut
 import com.ichi2.anki.android.view.locationInWindow
+import com.ichi2.anki.browser.CardBrowserFragment
 import com.ichi2.anki.common.annotations.NeedsTest
 import com.ichi2.anki.common.crashreporting.CrashReportService
 import com.ichi2.anki.common.destinations.navigate
@@ -161,6 +164,7 @@ import com.ichi2.anki.observability.ChangeManager
 import com.ichi2.anki.pages.AnkiPackageImporterFragment
 import com.ichi2.anki.pages.CongratsPage
 import com.ichi2.anki.pages.CongratsPage.Companion.onDeckCompleted
+import com.ichi2.anki.pages.Statistics
 import com.ichi2.anki.preferences.AdvancedSettingsFragment
 import com.ichi2.anki.preferences.PreferencesActivity
 import com.ichi2.anki.preferences.sharedPrefs
@@ -520,6 +524,7 @@ open class DeckPicker :
 
         // create inherited navigation drawer layout here so that it can be used by parent class
         initNavigationDrawer()
+        setupBottomNav()
         setupEdgeToEdge()
         title = resources.getString(R.string.app_name)
 
@@ -613,6 +618,72 @@ open class DeckPicker :
     }
 
     override fun fitsSystemWindows(): Boolean = false
+
+    /**
+     * Sets up the bottom navigation bar when the developer option is enabled.
+     * On phones, hides the navigation drawer and shows the bottom nav with tab switching.
+     * On tablets (fragmented), this is a no-op.
+     */
+    private fun setupBottomNav() {
+        if (!Prefs.devBottomNavEnabled || fragmented) return
+
+        val bottomNav = findViewById<BottomNavigationView>(R.id.bottom_navigation)
+        val fragmentContainer = findViewById<View>(R.id.bottom_nav_fragment_container)
+        val contentWrapper = findViewById<View>(R.id.deck_picker_content_wrapper)
+        bottomNav.isVisible = true
+        disableDrawerSwipe()
+
+        bottomNav.setOnItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_home -> {
+                    fragmentContainer.isVisible = false
+                    supportFragmentManager.commit {
+                        supportFragmentManager.fragments.forEach { frag ->
+                            if (frag.id == R.id.bottom_nav_fragment_container) hide(frag)
+                        }
+                    }
+                    contentWrapper.isVisible = true
+                    floatingActionMenu.showFloatingActionButton()
+                    true
+                }
+                R.id.nav_browser -> {
+                    showBottomNavFragment(CardBrowserFragment(), "browser", contentWrapper, fragmentContainer)
+                    true
+                }
+                R.id.nav_stats -> {
+                    showBottomNavFragment(Statistics(), "stats", contentWrapper, fragmentContainer)
+                    true
+                }
+                R.id.nav_more -> {
+                    showBottomNavFragment(MoreFragment(), "more", contentWrapper, fragmentContainer)
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    private fun showBottomNavFragment(
+        fragment: Fragment,
+        tag: String,
+        contentWrapper: View,
+        fragmentContainer: View,
+    ) {
+        contentWrapper.isVisible = false
+        floatingActionMenu.hideFloatingActionButton()
+        supportFragmentManager.commit {
+            supportFragmentManager.fragments.forEach { frag ->
+                if (frag.id == R.id.bottom_nav_fragment_container) hide(frag)
+            }
+            val existing = supportFragmentManager.findFragmentByTag(tag)
+            if (existing != null) {
+                show(existing)
+            } else {
+                add(R.id.bottom_nav_fragment_container, fragment, tag)
+            }
+        }
+        fragmentContainer.isVisible = true
+    }
 
     /** Applied edge-to-edge insets for the screen */
     private fun setupEdgeToEdge() {
