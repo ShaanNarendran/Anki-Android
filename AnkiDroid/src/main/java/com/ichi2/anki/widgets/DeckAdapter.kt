@@ -88,6 +88,12 @@ class DeckAdapter(
             }
         }
 
+    /**
+     * Whether to highlight the selected deck. Usually true for fragmented (tablet) layouts
+     * where the deck contents are shown side-by-side, but false for phones.
+     */
+    var highlightSelected: Boolean = true
+
     class ViewHolder(
         val binding: ItemDeckBinding,
     ) : RecyclerView.ViewHolder(binding.root)
@@ -151,7 +157,7 @@ class DeckAdapter(
         }
         holder.binding.deckLayout.setBackgroundResource(rowCurrentDrawable)
         // set a different background color for the current selected deck
-        if (node.isSelected) {
+        if (node.isSelected && highlightSelected) {
             holder.binding.deckLayout.setBackgroundResource(rowCurrentDrawable)
             if (activityHasBackground) {
                 val background =
@@ -170,10 +176,15 @@ class DeckAdapter(
         // Set the card counts and their colors
         binding.deckNew.text = node.newCount.toString()
         binding.deckNew.setTextColor(if (node.newCount == 0) zeroCountColor else newCountColor)
+        binding.deckNew.setTypeface(null, if (node.newCount == 0) android.graphics.Typeface.NORMAL else android.graphics.Typeface.BOLD)
+
         binding.deckLearn.text = node.lrnCount.toString()
         binding.deckLearn.setTextColor(if (node.lrnCount == 0) zeroCountColor else learnCountColor)
+        binding.deckLearn.setTypeface(null, if (node.lrnCount == 0) android.graphics.Typeface.NORMAL else android.graphics.Typeface.BOLD)
+
         binding.deckReview.text = node.revCount.toString()
         binding.deckReview.setTextColor(if (node.revCount == 0) zeroCountColor else reviewCountColor)
+        binding.deckReview.setTypeface(null, if (node.revCount == 0) android.graphics.Typeface.NORMAL else android.graphics.Typeface.BOLD)
 
         holder.binding.deckLayout.setOnClickListener { onDeckSelected(node.did) }
         holder.binding.deckLayout.setOnLongClickListener {
@@ -181,6 +192,7 @@ class DeckAdapter(
             true
         }
         binding.countsLayout.setOnClickListener { onDeckCountsSelected(node.did) }
+        binding.deckSettings.setOnClickListener { onDeckContextRequested(node.did) }
 
         // Right click listener for right click context menus
         holder.binding.deckLayout.setOnGenericMotionListener { _, motionEvent ->

@@ -538,7 +538,9 @@ open class DeckPicker :
                     viewModel.requestRightClickContextMenu(deckId, x, y)
                     Timber.d("Right Click on deck recorded!! %d, %f %f", deckId, x, y)
                 },
-            )
+            ).apply {
+                highlightSelected = fragmented
+            }
         deckPickerBinding.decks.adapter = deckListAdapter
 
         lifecycleScope.launch { applyDeckPickerBackground() }
