@@ -75,6 +75,7 @@ import com.ichi2.anki.R
 import com.ichi2.anki.android.input.ShortcutGroup
 import com.ichi2.anki.android.input.shortcut
 import com.ichi2.anki.android.menu.SearchBarMenuHost
+import com.ichi2.anki.bottomNavigationInset
 import com.ichi2.anki.browser.CardBrowserViewModel.ChangeMultiSelectMode
 import com.ichi2.anki.browser.CardBrowserViewModel.ChangeMultiSelectMode.MultiSelectCause
 import com.ichi2.anki.browser.CardBrowserViewModel.ChangeMultiSelectMode.SingleSelectCause
@@ -503,15 +504,26 @@ class CardBrowserFragment :
     private fun applyContentInsets(root: View) {
         val browserScroller = root.findViewById<RecyclerFastScroller>(R.id.browser_scroller)
         val toolbarContainer = root.findViewById<View?>(R.id.toolbar_container)
+        val searchAppBar = root.findViewById<View?>(R.id.browser_app_bar)
         ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
             val bars = insets.getInsets(systemBars() or displayCutout() or ime())
-            v.updatePadding(left = bars.left, right = bars.right)
-            toolbarContainer?.updatePadding(top = bars.top)
+            // As in the deck list, a toolbar's background continues beneath a display cutout:
+            // only its content and the cards are inset
+            when {
+                toolbarContainer != null -> {
+                    toolbarContainer.updatePadding(left = bars.left, top = bars.top, right = bars.right)
+                    root.findViewById<View>(R.id.root_layout).updatePadding(left = bars.left, right = bars.right)
+                }
+                searchAppBar != null -> {
+                    searchAppBar.updatePadding(left = bars.left, right = bars.right)
+                    root.findViewById<View>(R.id.browser_content).updatePadding(left = bars.left, right = bars.right)
+                }
+                else -> v.updatePadding(left = bars.left, right = bars.right)
+            }
             // The bottom of the safe area is above the navigation bar, rounded display corners and keyboard.
             // When scrolled to the bottom of the scrollbar should be aligned with the last row.
-            // Embedded content already ends above the bottom navigation, including its system-bar inset.
-            val safeAreaBottom =
-                if (activity is CardBrowser) maxOf(bars.bottom, insets.bottomCornerClearance(v)) else 0
+            // When embedded, content also scrolls beneath the bottom navigation.
+            val safeAreaBottom = bottomNavigationInset(insets, maxOf(bars.bottom, insets.bottomCornerClearance(v)))
             // Due to clipToPadding=false, only the last row is affected
             cardsListView.updatePadding(bottom = safeAreaBottom)
             // The scrollbar track stays full-height (edge to edge); only the handle is kept above

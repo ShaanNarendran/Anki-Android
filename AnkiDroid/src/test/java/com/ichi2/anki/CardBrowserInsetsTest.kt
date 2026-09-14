@@ -11,10 +11,12 @@ import com.ichi2.anki.ui.RecyclerFastScroller
 import com.ichi2.testutils.dispatchInsets
 import com.ichi2.testutils.lastItemView
 import com.ichi2.testutils.scrollToLastPosition
+import com.ichi2.testutils.withBooleanPreference
 import org.hamcrest.MatcherAssert.assertThat
 import org.hamcrest.Matchers.allOf
 import org.hamcrest.Matchers.equalTo
 import org.hamcrest.Matchers.greaterThan
+import org.hamcrest.Matchers.greaterThanOrEqualTo
 import org.hamcrest.Matchers.lessThan
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -179,6 +181,25 @@ class CardBrowserInsetsTest : RobolectricTest() {
             )
         }
 
+    /** The search bar's background continues beneath a display cutout: only its content is inset */
+    @Test
+    fun `search bar background continues beneath a cutout`() =
+        // runTest: the search bar's flows deadlock without the test dispatchers
+        runTest {
+            withBooleanPreference(R.string.dev_card_browser_search_view, true) {
+                withCardBrowser(noteCount = 1) { browser ->
+                    browser.dispatchInsets(cutoutLeft = 32.dp)
+                    browser.layoutForTest()
+
+                    val cutout = 32.dp.toPx(targetContext)
+                    val searchBar = browser.findViewById<View>(R.id.search_bar)
+                    assertThat("bar reaches the edge", (searchBar.parent as View).leftOnScreen, equalTo(0))
+                    assertThat("search bar clears the cutout", searchBar.leftOnScreen, greaterThanOrEqualTo(cutout))
+                    assertThat("cards clear the cutout", browser.cardList.leftOnScreen, greaterThanOrEqualTo(cutout))
+                }
+            }
+        }
+
     @Test
     fun `a side navigation bar clearing the corner removes the bottom buffer`() =
         withCardBrowser(noteCount = 50) { browser ->
@@ -241,6 +262,9 @@ class CardBrowserInsetsTest : RobolectricTest() {
 
     private val CardBrowser.fastScroller: RecyclerFastScroller
         get() = findViewById(R.id.browser_scroller)
+
+    private val View.leftOnScreen: Int
+        get() = IntArray(2).also { getLocationOnScreen(it) }[0]
 
     /** Forces a measure/layout pass so view bounds (not just padding/insets) can be asserted. */
     private fun CardBrowser.layoutForTest() {

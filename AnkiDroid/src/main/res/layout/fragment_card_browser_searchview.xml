@@ -10,6 +10,7 @@
     android:windowSoftInputMode="adjustNothing">
 
     <LinearLayout
+        android:id="@+id/browser_content"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
@@ -50,6 +51,7 @@
     </LinearLayout>
 
     <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/browser_app_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="?attr/colorSurface"
