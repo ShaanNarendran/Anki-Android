@@ -71,6 +71,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import anki.collection.OpChanges
 import anki.sync.SyncStatusResponse
+import com.google.android.material.behavior.HideViewOnScrollBehavior
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.google.android.material.snackbar.BaseTransientBottomBar
 import com.google.android.material.snackbar.Snackbar
@@ -711,8 +712,12 @@ open class DeckPicker :
             )
             deckPickerBinding.reviewSummaryTextView.updatePadding(bottom = withKeyboard.bottom)
 
-            val bottomNavView = findViewById<View?>(R.id.bottom_navigation)
-            val bottomNavOffset = if (bottomNavView?.isVisible == true) BOTTOM_NAV_HEIGHT_DP.dp.toPx(this) else 0
+            val bottomNavOffset =
+                if (binding.bottomNavigation?.let { it.isVisible && HideViewOnScrollBehavior.from(it).isScrolledIn } == true) {
+                    BOTTOM_NAV_HEIGHT_DP.dp.toPx(this)
+                } else {
+                    0
+                }
             // the keyboard covers the bottom navigation: clear whichever is taller
             floatingActionButtonBinding.root.updatePadding(
                 bottom = maxOf(bars.bottom + bottomNavOffset, withKeyboard.bottom),

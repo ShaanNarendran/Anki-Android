@@ -16,7 +16,9 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentTransaction
 import androidx.fragment.app.commit
 import androidx.lifecycle.ViewModelProvider
+import com.google.android.material.behavior.HideViewOnScrollBehavior
 import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.google.android.material.color.MaterialColors
 import com.ichi2.anki.BottomNavController.NavigationItem
 import com.ichi2.anki.browser.CardBrowserFragment
 import com.ichi2.anki.browser.CardBrowserViewModel
@@ -42,7 +44,68 @@ fun setupBottomNavigation() {
     val bottomNav = deckPicker.findViewById<BottomNavigationView>(R.id.bottom_navigation)
     val fragmentContainer = deckPicker.findViewById<View>(R.id.bottom_nav_fragment_container)
     val contentWrapper = deckPicker.findViewById<View>(R.id.deck_picker_content_wrapper)
+    val studiedSummary = deckPicker.deckPickerBinding.reviewSummaryTextView
+    // Keep scrolled deck titles from appearing behind the line once it sits above the bar.
+    studiedSummary.setBackgroundColor(MaterialColors.getColor(bottomNav, com.google.android.material.R.attr.colorSurface))
     bottomNav.isVisible = true
+    val scrollBehavior = HideViewOnScrollBehavior.from(bottomNav)
+
+    fun updateFragmentBottomMargin() {
+        val margin =
+            if (scrollBehavior.isScrolledIn) {
+                bottomNav.height
+            } else {
+                ViewCompat.getRootWindowInsets(bottomNav)?.getInsets(navigationBars())?.bottom ?: 0
+            }
+        if (fragmentContainer.marginBottom != margin) {
+            fragmentContainer.updateLayoutParams<ViewGroup.MarginLayoutParams> { bottomMargin = margin }
+        }
+    }
+
+    fun positionStudiedSummary(animate: Boolean) {
+        // The summary is pinned to the screen bottom inside Home, not to the bottom nav.
+        // Place it above the visible bar; as the bar slides out, move it down and fade it
+        // instead of leaving it readable underneath the system navigation bar.
+        val translation =
+            if (scrollBehavior.isScrolledIn && studiedSummary.height > 0) {
+                val navLocation = IntArray(2).also(bottomNav::getLocationInWindow)
+                val summaryLocation = IntArray(2).also(studiedSummary::getLocationInWindow)
+                // Ignore any in-flight translations to position the text above the bar at rest.
+                val navTop = navLocation[1] - bottomNav.translationY
+                val summaryContentBottom =
+                    summaryLocation[1] - studiedSummary.translationY + studiedSummary.height - studiedSummary.paddingBottom
+                navTop - summaryContentBottom - studiedSummary.marginBottom
+            } else if (scrollBehavior.isScrolledIn) {
+                -bottomNav.height.toFloat()
+            } else {
+                0f
+            }
+        val alpha = if (scrollBehavior.isScrolledIn) 1f else 0f
+        studiedSummary.animate().cancel()
+        if (animate) {
+            studiedSummary
+                .animate()
+                .translationY(translation)
+                .alpha(alpha)
+                .setDuration(bottomNav.resources.getInteger(android.R.integer.config_shortAnimTime).toLong())
+                .start()
+        } else {
+            studiedSummary.translationY = translation
+            studiedSummary.alpha = alpha
+        }
+    }
+
+    // Keep navigation available when touch exploration is in use.
+    scrollBehavior.disableOnTouchExploration(true)
+    scrollBehavior.addOnScrollStateChangedListener { _, _ ->
+        updateFragmentBottomMargin()
+        positionStudiedSummary(animate = true)
+        // The summary's alpha does not affect the deck list's separate fade overlay.
+        // Remove that fade while the summary and bottom bar are hidden.
+        deckPicker.deckPickerBinding.decksFadeWrapper.anchorView = studiedSummary.takeIf { scrollBehavior.isScrolledIn }
+        // The Home FAB and deck list use the bottom bar's height when calculating their insets.
+        ViewCompat.requestApplyInsets(deckPicker.deckPickerBinding.root)
+    }
 
     NavigationItem.populateMenu(bottomNav, deckPicker)
 
@@ -66,14 +129,17 @@ fun setupBottomNavigation() {
         val navItem = NavigationItem.fromId(item.itemId) ?: return@setOnItemSelectedListener false
         if (item.itemId != bottomNav.selectedItemId) {
             Analytics.sendAnalyticsScreenView(navItem.analyticsScreenName)
+            scrollBehavior.slideIn(bottomNav)
         }
         handleNavigationItemSelected(navItem, contentWrapper, fragmentContainer, bottomNavBackCallback)
     }
 
-    bottomNav.addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
-        if (fragmentContainer.marginBottom != view.height) {
-            fragmentContainer.updateLayoutParams<ViewGroup.MarginLayoutParams> { bottomMargin = view.height }
-        }
+    bottomNav.addOnLayoutChangeListener { _, _, top, _, bottom, _, oldTop, _, oldBottom ->
+        updateFragmentBottomMargin()
+        if (bottom - top != oldBottom - oldTop) positionStudiedSummary(animate = false)
+    }
+    studiedSummary.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+        if (scrollBehavior.isScrolledIn) positionStudiedSummary(animate = false)
     }
 }
 
@@ -168,6 +234,15 @@ private fun showBottomNavFragment(
         }
     }
     fragmentContainer.isVisible = true
+}
+
+/** Route scrolls from views which do not propagate nested scrolling to the Material behavior. */
+fun Fragment.updateBottomNavOnScroll(dy: Int) {
+    val deckPicker = activity as? DeckPicker ?: return
+    if (dy == 0 || !isVisible || !deckPicker.bottomNavigationEnabled) return
+    val bottomNav = deckPicker.binding.bottomNavigation ?: return
+    val behavior = HideViewOnScrollBehavior.from(bottomNav)
+    if (dy > 0) behavior.slideOut(bottomNav) else behavior.slideIn(bottomNav)
 }
 
 /** Hides any fragments currently hosted in the bottom-nav container. */

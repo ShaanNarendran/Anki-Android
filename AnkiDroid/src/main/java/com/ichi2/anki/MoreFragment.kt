@@ -39,6 +39,10 @@ class MoreFragment : Fragment(R.layout.fragment_more) {
     ) {
         super.onViewCreated(view, savedInstanceState)
 
+        binding.moreScrollView.setOnScrollChangeListener { _, _, scrollY, _, oldScrollY ->
+            updateBottomNavOnScroll(scrollY - oldScrollY)
+        }
+
         val marketIntent = AnkiDroidApp.getMarketIntent(requireContext())
 
         binding.moreSettings.setOnClickListener {

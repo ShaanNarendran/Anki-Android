@@ -20,6 +20,7 @@ import com.ichi2.anki.dialogs.startDeckSelection
 import com.ichi2.anki.launchCatchingTask
 import com.ichi2.anki.model.SelectableDeck
 import com.ichi2.anki.snackbar.showSnackbar
+import com.ichi2.anki.updateBottomNavOnScroll
 import com.ichi2.anki.withProgress
 import dev.androidbroadcast.vbpd.viewBinding
 import timber.log.Timber
@@ -63,6 +64,13 @@ class Statistics : PageFragment(R.layout.page_statistics) {
                     savedInstanceState?.getString(KEY_DECK_NAME, null) ?: withCol { decks.current().name }
                 changeDeck(deckName)
             }
+        }
+    }
+
+    override fun onWebViewCreated() {
+        // The WebView can be replaced after its renderer exits; attach to each new instance.
+        webViewLayout.setOnScrollChangeListener { _, _, scrollY, _, oldScrollY ->
+            updateBottomNavOnScroll(scrollY - oldScrollY)
         }
     }
 
